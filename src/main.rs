@@ -2,9 +2,9 @@ extern crate config;
 
 use lazy_static::lazy_static;
 use crate::udp_client::initialize_socket;
-use std::io::Write;
-use std::borrow::{Borrow, BorrowMut};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::io::{Write, Error};
+use std::borrow::{Borrow};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, Shutdown};
 use socket2::SockAddr;
 use std::time::Duration;
 use std::thread;
@@ -42,6 +42,69 @@ const BAT_CHARGE : &str = "smainverter_battery_charge_percentage";
 const BAT_TEMPERATURE : &str = "smainverter_battery_temperature_degreescelsius";
 const DC_VOLTAGE : &str = "smainverter_spot_dc_voltage_millivolts";
 const DC_CURRENT : &str = "smainverter_spot_dc_current_milliamperes";
+
+fn find_inverters() -> Result<Vec<Inverter>, Error> {
+
+    let mut socket = initialize_socket(true);
+    match socket.send_to([0x53, 0x4D, 0x41, 0x00,
+                             0x00, 0x04, 0x02, 0xA0,
+                             0xFF, 0xFF, 0xFF, 0xFF,
+                             0x00, 0x00, 0x00, 0x20,
+                             0x00, 0x00, 0x00, 0x00].borrow(),
+                         &SockAddr::from(SocketAddr::new(Ipv4Addr::new(239, 12, 255, 254).into(), 9522)))
+    {
+        Ok(_size) => {
+
+        }
+        Err(err) => {
+            println!("{}", err);
+            return Err(err);
+        }
+    }
+
+    match socket.flush() {
+        Ok(_x) => {
+
+        }
+
+        Err(err) => {
+            println!("{}", err);
+            return Err(err);
+        }
+    }
+
+    let mut inverters = Vec::new();
+    let mut buf = [0u8; 65];
+    match socket.set_read_timeout(Some(Duration::from_millis(100)))
+    {
+        Ok(_x) => {
+
+        }
+
+        Err(err) => {
+            println!("{}", err);
+            return Err(err);
+        }
+    }
+    let mut readable = true;
+    while readable {
+        match socket.recv_from(&mut buf) {
+            Ok((len, remote_addr)) => {
+                if len == 65 {
+                    if remote_addr.as_inet().unwrap().eq(&SocketAddrV4::new(Ipv4Addr::new(buf[38], buf[39], buf[40], buf[41]), 9522)) {
+                        println!("found {}.{}.{}.{}", buf[38], buf[39], buf[40], buf[41]);
+                        inverters.push(Inverter::new(remote_addr.as_std().unwrap()))
+                    }
+                }
+            }
+            Err(_err) => {
+                readable = false;
+            }
+        }
+    }
+    socket.shutdown(Shutdown::Both);
+    Ok(inverters)
+}
 
 #[tokio::main]
 async fn main() {
@@ -84,73 +147,12 @@ async fn main() {
         Ok::<_, Infallible>(service_fn(handle))
     });
 
-    let mut socket = initialize_socket();
-    match socket.send_to([0x53, 0x4D, 0x41, 0x00,
-                       0x00, 0x04, 0x02, 0xA0,
-                       0xFF, 0xFF, 0xFF, 0xFF,
-                       0x00, 0x00, 0x00, 0x20,
-                       0x00, 0x00, 0x00, 0x00].borrow(),
-                   &SockAddr::from(SocketAddr::new(Ipv4Addr::new(239, 12, 255, 254).into(), 9522)))
-    {
-        Ok(_size) => {
-
-        }
-        Err(err) => {
-            println!("{}", err);
-            return;
-        }
-    }
-
-    match socket.flush() {
-        Ok(_x) => {
-
-        }
-
-        Err(err) => {
-            println!("{}", err);
-            return;
-        }
-    }
-
-    let mut inverters = Vec::new();
-    let mut buf = [0u8; 65];
-    match socket.set_read_timeout(Some(Duration::from_millis(100)))
-    {
-        Ok(_x) => {
-
-        }
-
-        Err(err) => {
-            println!("{}", err);
-            return;
-        }
-    }
-    let mut readable = true;
-    while readable {
-        match socket.recv_from(&mut buf) {
-            Ok((len, remote_addr)) => {
-                if len == 65 {
-                    if remote_addr.as_inet().unwrap().eq(&SocketAddrV4::new(Ipv4Addr::new(buf[38], buf[39], buf[40], buf[41]), 9522)) {
-                        println!("found {}.{}.{}.{}", buf[38], buf[39], buf[40], buf[41]);
-                        inverters.push(Inverter::new(remote_addr.as_std().unwrap()))
-                    }
-                }
-            }
-            Err(_err) => {
-                readable = false;
-            }
-        }
-    }
-
-
-    println!("Found {} inverters.", inverters.len());
-
-    socket.leave_multicast_v4(&Ipv4Addr::new(239, 12, 255, 254), &Ipv4Addr::new(0, 0, 0, 0));
 
     // Spawn one second timer
     thread::spawn(move || {
 
         let mut counter = 0;
+        let mut socket= initialize_socket(false);
 
         loop {
             let mut logged_in_inverters : Vec<Inverter> = Vec::new();
@@ -172,10 +174,22 @@ async fn main() {
                     }
                 }
 
+                let inverters = match find_inverters() {
+                    Ok(found_inverters) => {
+                        found_inverters
+                    }
+                    Err(err) => {
+                        println!("Error while finding inverters: {}", err);
+                        Vec::new()
+                    }
+                };
+
+                socket = initialize_socket(false);
+
                 for mut i in inverters.to_vec() {
                     let pass_key = format!("{}{}", &i.address.ip().to_string(), ".password");
-                    let mut password = settings.get_str(pass_key.as_str()).unwrap_or("0000".to_string());
-                    match i.login(socket.borrow(),  password.as_str()) {
+                    let password = settings.get_str(pass_key.as_str()).unwrap_or("0000".to_string());
+                    match i.login(&socket,  password.as_str()) {
                         Ok(_result) => {
                             logged_in_inverters.push(i);
                         }
@@ -193,15 +207,16 @@ async fn main() {
             {
                 counter = 0;
 
-                for mut i in &mut logged_in_inverters {
-                    i.logoff(socket.borrow());
+                for i in &mut logged_in_inverters {
+                    i.logoff(&socket);
                 }
 
+                socket.shutdown(Shutdown::Both);
                 println!("Logged off.");
             }
 
             for i in &mut logged_in_inverters {
-                match i.get_battery_info(socket.borrow())  {
+                match i.get_battery_info(&socket)  {
                     Ok(data) => {
                         let _lock = LOCK.lock().unwrap();
                         gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["A"]).set(data.temperature[0] as f64 / 10 as f64);

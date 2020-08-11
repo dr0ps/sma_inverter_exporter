@@ -19,7 +19,6 @@ pub struct InverterError {
 }
 
 pub struct DataType {
-    value: u32,
     command: u32,
     first: u32,
     last: u32,
@@ -219,9 +218,9 @@ impl Inverter {
         socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address));
     }
 
-    const SPOT_DC_VOLTAGE: DataType = DataType{value: 1 << 2, command: 0x53800200, first: 0x00451F00, last: 0x004521FF};
-    const BATTERY_CHARGE_STATUS: DataType = DataType{value: 1 << 14, command: 0x51000200, first: 0x00295A00, last: 0x00295AFF};
-    const BATTERY_INFO: DataType = DataType{value: 1 << 15, command: 0x51000200, first: 0x00491E00, last: 0x00495DFF};
+    const SPOT_DC_VOLTAGE: DataType = DataType{command: 0x53800200, first: 0x00451F00, last: 0x004521FF};
+    const BATTERY_CHARGE_STATUS: DataType = DataType{command: 0x51000200, first: 0x00295A00, last: 0x00295AFF};
+    const BATTERY_INFO: DataType = DataType{command: 0x51000200, first: 0x00491E00, last: 0x00495DFF};
 
     fn get_data(&mut self, socket:&Socket, data_type:&DataType) -> Result<ByteBuffer, InverterError>{
         let mut buffer = ByteBuffer::new();

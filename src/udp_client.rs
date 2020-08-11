@@ -25,13 +25,15 @@ use std::net::{SocketAddr, Ipv4Addr};
 //default values
 const PORT: u16  = 9523;
 
-pub fn initialize_socket() -> Socket {
+pub fn initialize_socket(multicast : bool) -> Socket {
     let socket = Socket::new(Domain::ipv4(), Type::dgram(), Some(Protocol::udp())).unwrap();
     socket.set_reuse_address(true).unwrap();
     socket.bind(&SockAddr::from(SocketAddr::new(
         Ipv4Addr::new(0, 0, 0, 0).into(),
         PORT))).unwrap();
-    assert!(socket.join_multicast_v4(&Ipv4Addr::new(239, 12, 255, 254), &Ipv4Addr::new(0, 0, 0, 0)).is_ok());
+    if multicast {
+        assert!(socket.join_multicast_v4(&Ipv4Addr::new(239, 12, 255, 254), &Ipv4Addr::new(0, 0, 0, 0)).is_ok());
+    }
     socket
 }
 
