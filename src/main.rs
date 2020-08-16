@@ -154,8 +154,9 @@ async fn main() {
         let mut counter = 0;
         let mut socket= initialize_socket(false);
 
+        let mut logged_in_inverters : Vec<Inverter> = Vec::new();
+
         loop {
-            let mut logged_in_inverters : Vec<Inverter> = Vec::new();
 
             thread::sleep(Duration::from_secs(10));
 
@@ -210,6 +211,8 @@ async fn main() {
                 for i in &mut logged_in_inverters {
                     i.logoff(&socket);
                 }
+
+                logged_in_inverters.clear();
 
                 socket.shutdown(Shutdown::Both);
                 println!("Logged off.");
