@@ -44,7 +44,7 @@ pub enum LRI {
 pub struct BatteryInfo {
     pub temperature: [u16;3],
     pub voltage: [u16;3],
-    pub current: [u16;3]
+    pub current: [i16;3]
 }
 
 pub struct DCInfo {
@@ -405,8 +405,8 @@ impl Inverter {
                     }
                     else if lri == BatAmp as u32 && battery_info.current[0] == 0 {
                         let _date = buffer.read_u32();
-                        let value = buffer.read_u32();
-                        battery_info.current[0] = value as u16;
+                        let value = buffer.read_i32();
+                        battery_info.current[0] = value as i16;
                         buffer.read_u32();
                         buffer.read_u32();
                         buffer.read_u32();
@@ -414,8 +414,8 @@ impl Inverter {
                     }
                     else if lri == BatAmp as u32 && battery_info.current[1] == 0 {
                         let _date = buffer.read_u32();
-                        let value = buffer.read_u32();
-                        battery_info.current[1] = value as u16;
+                        let value = buffer.read_i32();
+                        battery_info.current[1] = value as i16;
                         buffer.read_u32();
                         buffer.read_u32();
                         buffer.read_u32();
@@ -423,8 +423,8 @@ impl Inverter {
                     }
                     else if lri == BatAmp as u32 && battery_info.current[2] == 0 {
                         let _date = buffer.read_u32();
-                        let value = buffer.read_u32();
-                        battery_info.current[2] = value as u16;
+                        let value = buffer.read_i32();
+                        battery_info.current[2] = value as i16;
                         buffer.read_u32();
                         buffer.read_u32();
                         buffer.read_u32();
