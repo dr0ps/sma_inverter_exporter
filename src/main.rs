@@ -42,6 +42,8 @@ const BAT_CHARGE : &str = "smainverter_battery_charge_percentage";
 const BAT_TEMPERATURE : &str = "smainverter_battery_temperature_degreescelsius";
 const DC_VOLTAGE : &str = "smainverter_spot_dc_voltage_millivolts";
 const DC_CURRENT : &str = "smainverter_spot_dc_current_milliamperes";
+const PRODUCTION_TOTAL : &str = "smainverter_metering_total_watthours";
+const PRODUCTION_DAILY : &str = "smainverter_metering_daily_watthours";
 
 fn find_inverters() -> Result<Vec<Inverter>, Error> {
 
@@ -102,7 +104,14 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
             }
         }
     }
-    socket.shutdown(Shutdown::Both);
+    match socket.shutdown(Shutdown::Both) {
+        Ok(_result) => {
+
+        }
+        Err(error) => {
+            println!("Unable to shutdown socket. {}", error);
+        }
+    }
     Ok(inverters)
 }
 
@@ -141,6 +150,16 @@ async fn main() {
     register(Box::new(gauge.borrow().clone())).unwrap();
     gauges.insert(DC_CURRENT, gauge);
 
+    let gauge_opts = Opts::new(PRODUCTION_TOTAL, "Total Production");
+    let gauge = GaugeVec::new(gauge_opts, &["inverter"]).unwrap();
+    register(Box::new(gauge.borrow().clone())).unwrap();
+    gauges.insert(PRODUCTION_TOTAL, gauge);
+
+    let gauge_opts = Opts::new(PRODUCTION_DAILY, "Daily Production");
+    let gauge = GaugeVec::new(gauge_opts, &["inverter"]).unwrap();
+    register(Box::new(gauge.borrow().clone())).unwrap();
+    gauges.insert(PRODUCTION_DAILY, gauge);
+
     let addr = SocketAddr::from(([127, 0, 0, 1], 9745));
 
     let make_svc = make_service_fn(|_conn| async {
@@ -148,7 +167,6 @@ async fn main() {
     });
 
 
-    // Spawn one second timer
     thread::spawn(move || {
 
         let mut counter = 0;
@@ -214,7 +232,14 @@ async fn main() {
 
                 logged_in_inverters.clear();
 
-                socket.shutdown(Shutdown::Both);
+                match socket.shutdown(Shutdown::Both) {
+                    Ok(_result) => {
+
+                    }
+                    Err(error) => {
+                        println!("Unable to shutdown socket. {}", error);
+                    }
+                }
                 println!("Logged off.");
             }
 
@@ -259,6 +284,19 @@ async fn main() {
                         gauges.get(BAT_CHARGE).unwrap().with_label_values(&["A"]).set(data[0] as f64);
                         gauges.get(BAT_CHARGE).unwrap().with_label_values(&["B"]).set(data[1] as f64);
                         gauges.get(BAT_CHARGE).unwrap().with_label_values(&["C"]).set(data[2] as f64);
+                    }
+                    Err(inverter_error) => {
+                        if inverter_error.message.ne("Unsupported")
+                        {
+                            println!("Inverter error: {}", inverter_error.message);
+                        }
+                    }
+                }
+                match i.get_energy_production(socket.borrow())  {
+                    Ok(data) => {
+                        let _lock = LOCK.lock().unwrap();
+                        gauges.get(PRODUCTION_DAILY).unwrap().with_label_values(&[&i.address.ip().to_string()]).set(data.daily_wh as f64);
+                        gauges.get(PRODUCTION_TOTAL).unwrap().with_label_values(&[&i.address.ip().to_string()]).set(data.total_wh as f64);
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported")

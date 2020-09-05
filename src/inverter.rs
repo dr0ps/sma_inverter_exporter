@@ -3,7 +3,7 @@ use bytebuffer_new::ByteBuffer;
 use std::borrow::BorrowMut;
 use bytebuffer_new::Endian::{BigEndian, LittleEndian};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::inverter::LRI::{BatChaStt, BatTmpVal, BatAmp, BatVol, DcMsVol, DcMsAmp};
+use crate::inverter::LRI::{BatChaStt, BatTmpVal, BatAmp, BatVol, DcMsVol, DcMsAmp, MeteringTotWhOut, MeteringDyWhOut};
 use std::net::SocketAddr;
 
 #[derive(Clone)]
@@ -39,6 +39,8 @@ pub enum LRI {
     BatTmpVal = 0x00495B00,   // *40* Battery temperature
     BatVol = 0x00495C00,   // *40* Battery voltage
     BatAmp = 0x00495D00,   // *40* Battery current
+    MeteringTotWhOut = 0x00260100,   // *00* Total yield (aka SPOT_ETOTAL)
+    MeteringDyWhOut = 0x00262200,   // *00* Day yield (aka SPOT_ETODAY)
 }
 
 pub struct BatteryInfo {
@@ -52,6 +54,10 @@ pub struct DCInfo {
     pub current: [u16;2],
 }
 
+pub struct EnergyProductionInfo {
+    pub daily_wh: u32,
+    pub total_wh: u32,
+}
 
 impl Inverter {
     pub fn new(address : SocketAddr) -> Self {
@@ -138,7 +144,14 @@ impl Inverter {
 
         self.write_packet_length(buffer.borrow_mut());
 
-        socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address));
+        match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
+            Ok(_result) => {
+
+            }
+            Err(error) => {
+                println!("{}", error);
+            }
+        }
 
         let mut buf = [0u8; 500];
         return match socket.recv_from(buf.as_mut()) {
@@ -215,12 +228,20 @@ impl Inverter {
         buffer.write_u32(0);
         self.write_packet_length(buffer.borrow_mut());
 
-        socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address));
+        match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
+            Ok(_result) => {
+
+            }
+            Err(error) => {
+                println!("{}", error);
+            }
+        }
     }
 
     const SPOT_DC_VOLTAGE: DataType = DataType{command: 0x53800200, first: 0x00451F00, last: 0x004521FF};
     const BATTERY_CHARGE_STATUS: DataType = DataType{command: 0x51000200, first: 0x00295A00, last: 0x00295AFF};
     const BATTERY_INFO: DataType = DataType{command: 0x51000200, first: 0x00491E00, last: 0x00495DFF};
+    const ENERGY_PRODUCTION: DataType = DataType{command : 0x54000200, first: 0x00260100, last: 0x002622FF};
 
     fn get_data(&mut self, socket:&Socket, data_type:&DataType) -> Result<ByteBuffer, InverterError>{
         let mut buffer = ByteBuffer::new();
@@ -236,7 +257,14 @@ impl Inverter {
         buffer.write_u32(0);
         self.write_packet_length(buffer.borrow_mut());
 
-        socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address));
+        match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
+            Ok(_result) => {
+
+            }
+            Err(error) => {
+                println!("{}", error);
+            }
+        }
 
         let mut buf = [0u8; 500];
         return match socket.recv_from(buf.as_mut()) {
@@ -543,6 +571,56 @@ impl Inverter {
                 Result::Ok(dc_info)
             }
             Err(error) => Result::Err(InverterError { message: error.message })
+        }
+    }
+
+    pub fn get_energy_production(&mut self, socket: &Socket) -> Result<EnergyProductionInfo, InverterError>
+    {
+        return match self.get_data(socket, &Inverter::ENERGY_PRODUCTION) {
+            Ok(mut buffer) => {
+
+                let mut ep_info = EnergyProductionInfo{daily_wh: 0, total_wh: 0};
+
+                while buffer.len() > buffer.get_rpos() {
+                    let code = buffer.read_u32();
+                    if code == 0 {
+                        return Ok(ep_info);
+                    }
+                    let lri = code & 0x00FFFF00;
+                    let _data_type = code >> 24;
+                    if lri == MeteringTotWhOut as u32 && ep_info.total_wh == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ep_info.total_wh = value;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    }
+                    else if lri == MeteringDyWhOut as u32 && ep_info.daily_wh == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ep_info.daily_wh = value;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else {
+                        let _date = buffer.read_u32();
+                        println!("unhandled: {:x}", lri);
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    }
+                }
+                Result::Ok(ep_info)
+            }
+            Err(error) => {
+                println!("Unsupported");
+                Result::Err(InverterError { message: error.message })
+            }
         }
     }
 }
