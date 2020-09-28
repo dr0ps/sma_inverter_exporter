@@ -177,7 +177,6 @@ async fn main() {
         loop {
 
             thread::sleep(Duration::from_secs(10));
-
             if counter == 0
             {
                 logged_in_inverters.clear();
@@ -217,8 +216,6 @@ async fn main() {
                         }
                     }
                 }
-
-                println!("Logged in to {} inverters.", logged_in_inverters.len());
             }
 
             counter = counter+1;
@@ -240,10 +237,11 @@ async fn main() {
                         println!("Unable to shutdown socket. {}", error);
                     }
                 }
-                println!("Logged off.");
             }
 
+            print!("Getting data: ");
             for i in &mut logged_in_inverters {
+                print!("inverter {}, ", &i.address.ip().to_string());
                 match i.get_battery_info(&socket)  {
                     Ok(data) => {
                         let _lock = LOCK.lock().unwrap();
@@ -306,6 +304,7 @@ async fn main() {
                     }
                 }
             }
+            println!("done.");
         }
     });
 

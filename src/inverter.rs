@@ -559,13 +559,8 @@ impl Inverter {
                         buffer.read_u32();
                         buffer.read_u32();
                     } else {
-                        let _date = buffer.read_u32();
-                        println!("unhandled: {:x}", lri);
-                        buffer.read_u32();
-                        buffer.read_u32();
-                        buffer.read_u32();
-                        buffer.read_u32();
-                        buffer.read_u32();
+                        println!("unhandled (dc voltage): {:x}", lri);
+                        break;
                     }
                 }
                 Result::Ok(dc_info)
@@ -606,13 +601,8 @@ impl Inverter {
                         buffer.read_u32();
                         buffer.read_u32();
                     } else {
-                        let _date = buffer.read_u32();
-                        println!("unhandled: {:x}", lri);
-                        buffer.read_u32();
-                        buffer.read_u32();
-                        buffer.read_u32();
-                        buffer.read_u32();
-                        buffer.read_u32();
+                        println!("unhandled (energy production): {:x}", lri);
+                        break;
                     }
                 }
                 Result::Ok(ep_info)
