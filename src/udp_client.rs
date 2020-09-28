@@ -2,6 +2,7 @@ extern crate socket2;
 
 use self::socket2::{Socket, Domain, Type, Protocol, SockAddr};
 use std::net::{SocketAddr, Ipv4Addr};
+use tokio::time::Duration;
 
 /*
  *
@@ -31,6 +32,13 @@ pub fn initialize_socket(multicast : bool) -> Socket {
     socket.bind(&SockAddr::from(SocketAddr::new(
         Ipv4Addr::new(0, 0, 0, 0).into(),
         PORT))).unwrap();
+    match socket.set_read_timeout(Some(Duration::from_secs(1))) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("Unable to set socket timeout {}", error);
+        }
+    }
+
     if multicast {
         assert!(socket.join_multicast_v4(&Ipv4Addr::new(239, 12, 255, 254), &Ipv4Addr::new(0, 0, 0, 0)).is_ok());
     }
