@@ -266,7 +266,7 @@ impl Inverter {
             }
         }
 
-        let mut buf = [0u8; 500];
+        let mut buf = [0u8; 1024];
         return match socket.recv_from(buf.as_mut()) {
             Ok((len, remote_addr)) => {
                 if remote_addr.as_std().unwrap().eq(&self.address) {
@@ -280,7 +280,6 @@ impl Inverter {
                     buffer.read_u32();
                     buffer.read_u32();
                     let packet_length = buffer.read_u16();
-
                     //L2
                     let l2_magic_number = buffer.read_u32();
                     let _long_words = buffer.read_u8();
