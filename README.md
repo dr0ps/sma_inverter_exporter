@@ -4,9 +4,9 @@ This creates a single binary which exports values from SMA Inverters (both PV an
 
 ## Getting Started
 
-sma_inverter_exporter is written in Rust. When run it will create a http server running on port 9745 where it exports data for panel voltage and current, battery voltage and current and battery charge.
+You can download a build from the [release page](https://github.com/dr0ps/sma_inverter_exporter/releases/latest). When run it will create a http server running on port 9745 where it exports data for panel voltage and current, battery voltage and current and battery charge.
 
-### Prerequisites
+### Building from Source
 
 You need a Rust/Cargo installation. See https://rustup.rs/. After checking out this repository you can simply run
 
@@ -15,15 +15,6 @@ cargo run
 ```
 
 and if that works for you (point your browser to http://localhost:9745) you can install the binary.
-
-
-### Installing
-
-You can build a binary for deployment by running
-
-```
-cargo build --release
-```
 
 ## Configuration
 
