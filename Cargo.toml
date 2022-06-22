@@ -15,7 +15,7 @@ socket2 = {version = "0.3.16", features = ["reuseport"]}
 bytebuffer-new = "0.2.2"
 rand = "0.7.3"
 lazy_static = "1.4.0"
-config = "0.10.1"
+config = {version = "0.13.1", features=["ini"]}
 
 arc-swap = "0.4.8"
 futures-task ="0.3.7"

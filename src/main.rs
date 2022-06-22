@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use prometheus::{GaugeVec, TextEncoder, gather, Encoder, Opts, register};
 use hyper::{Response, Request, Body, Server};
 use std::convert::Infallible;
+use std::process::exit;
 use hyper::service::{make_service_fn, service_fn};
 use config::{Config, File};
 
@@ -181,14 +182,17 @@ async fn main() {
             {
                 logged_in_inverters.clear();
 
-                let mut settings = Config::default();
-                match settings
-                    .merge(File::with_name("/etc/sma_inverter_exporter.ini")) {
+                let builder = Config::builder()
+                    .add_source(File::with_name("/etc/sma_inverter_exporter.ini"));
+
+                let settings;
+                match builder.build() {
                     Err(error) => {
                         println!("Config error: {}", error);
+                        exit(1);
                     }
-                    Ok(_t) => {
-
+                    Ok(config) => {
+                        settings = config;
                     }
                 }
 
@@ -206,7 +210,7 @@ async fn main() {
 
                 for mut i in inverters.to_vec() {
                     let pass_key = format!("{}{}", &i.address.ip().to_string(), ".password");
-                    let password = settings.get_str(pass_key.as_str()).unwrap_or("0000".to_string());
+                    let password = settings.get_string(pass_key.as_str()).unwrap_or("0000".to_string());
                     match i.login(&socket,  password.as_str()) {
                         Ok(_result) => {
                             logged_in_inverters.push(i);
