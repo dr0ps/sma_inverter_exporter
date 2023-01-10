@@ -7,16 +7,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prometheus = {version="0.9.0", features = ["gen"]}
+prometheus = {version= "0.13.3", features = ["gen"]}
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 
 socket2 = {version = "0.3.16", features = ["reuseport"]}
 bytebuffer-new = "0.2.2"
-rand = "0.7.3"
+rand = "0.8.5"
 lazy_static = "1.4.0"
 config = {version = "0.13.1", features=["ini"]}
 
-arc-swap = "0.4.8"
+arc-swap = "1.6.0"
 futures-task ="0.3.7"
 futures-util = "0.3.7"
