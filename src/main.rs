@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use prometheus::{GaugeVec, TextEncoder, gather, Encoder, Opts, register};
 use hyper::{Response, Request, Body, Server};
 use std::convert::Infallible;
+use std::mem::MaybeUninit;
 use std::process::exit;
 use hyper::service::{make_service_fn, service_fn};
 use config::{Config, File};
@@ -46,6 +47,10 @@ const DC_CURRENT : &str = "smainverter_spot_dc_current_milliamperes";
 const PRODUCTION_TOTAL : &str = "smainverter_metering_total_watthours";
 const PRODUCTION_DAILY : &str = "smainverter_metering_daily_watthours";
 
+unsafe fn assume_init(buf: &[MaybeUninit<u8>]) -> &[u8] {
+    &*(buf as *const [MaybeUninit<u8>] as *const [u8])
+}
+
 fn find_inverters() -> Result<Vec<Inverter>, Error> {
 
     let mut socket = initialize_socket(true);
@@ -77,7 +82,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     }
 
     let mut inverters = Vec::new();
-    let mut buf = [0u8; 65];
+    let mut buf = [MaybeUninit::new(0 as u8); 65];
     match socket.set_read_timeout(Some(Duration::from_millis(100)))
     {
         Ok(_x) => {
@@ -94,9 +99,10 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
         match socket.recv_from(&mut buf) {
             Ok((len, remote_addr)) => {
                 if len == 65 {
-                    if remote_addr.as_inet().unwrap().eq(&SocketAddrV4::new(Ipv4Addr::new(buf[38], buf[39], buf[40], buf[41]), 9522)) {
-                        println!("found {}.{}.{}.{}", buf[38], buf[39], buf[40], buf[41]);
-                        inverters.push(Inverter::new(remote_addr.as_std().unwrap()))
+                    let ibuf = unsafe { assume_init(&buf) };
+                    if remote_addr.as_socket_ipv4().unwrap().eq(&SocketAddrV4::new(Ipv4Addr::new(ibuf[38], ibuf[39], ibuf[40], ibuf[41]), 9522)) {
+                        println!("found {}.{}.{}.{}", ibuf[38], ibuf[39], ibuf[40], ibuf[41]);
+                        inverters.push(Inverter::new(remote_addr.as_socket().unwrap()))
                     }
                 }
             }

@@ -11,7 +11,7 @@ prometheus = {version= "0.13.3", features = ["gen"]}
 hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 
-socket2 = {version = "0.3.16", features = ["reuseport"]}
+socket2 = {version = "0.4.7"}
 bytebuffer-new = "0.2.2"
 rand = "0.8.5"
 lazy_static = "1.4.0"

@@ -1,6 +1,7 @@
 use socket2::{SockAddr, Socket};
 use bytebuffer_new::ByteBuffer;
 use std::borrow::BorrowMut;
+use std::mem::MaybeUninit;
 use bytebuffer_new::Endian::{BigEndian, LittleEndian};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::inverter::LRI::{BatChaStt, BatTmpVal, BatAmp, BatVol, DcMsVol, DcMsAmp, MeteringTotWhOut, MeteringDyWhOut};
@@ -108,6 +109,12 @@ impl Inverter {
         buffer.write_u16(data_length);
     }
 
+    /// Assume the `buf`fer to be initialised.
+    // TODO: replace with `MaybeUninit::slice_assume_init_ref` once stable.
+    unsafe fn assume_init(&mut self, buf: &[MaybeUninit<u8>]) -> &[u8] {
+        &*(buf as *const [MaybeUninit<u8>] as *const [u8])
+    }
+
     pub fn login(&mut self, socket:&Socket, password : &str) -> Result<u16, InverterError>{
 
         let mut buffer = ByteBuffer::new();
@@ -153,16 +160,16 @@ impl Inverter {
             }
         }
 
-        let mut buf = [0u8; 500];
+        let mut buf = [MaybeUninit::new(0 as u8); 500];
         return match socket.recv_from(buf.as_mut()) {
             Ok((len, remote_addr)) => {
-                if remote_addr.as_std().unwrap().eq(&self.address) {
-                    let mut buffer = ByteBuffer::from_bytes(&buf[0..len]);
+                if remote_addr.as_socket().unwrap().eq(&self.address) {
+                    let mut buffer = ByteBuffer::from_bytes(unsafe { self.assume_init(&buf[0..len]) } );
                     buffer.set_endian(LittleEndian);
                     //L1
                     let l1_magic_number = buffer.read_u32();
                     if l1_magic_number != 0x00414D53 {
-                        return Result::Err(InverterError { message: "Packet does not start with SMA" });
+                        return Err(InverterError { message: "Packet does not start with SMA" });
                     }
                     buffer.read_u32();
                     buffer.read_u32();
@@ -189,26 +196,26 @@ impl Inverter {
 
                             if packet_id & 0x7FFF == self.packet_id as u16 {
                                 if error_code == 0 {
-                                    Result::Ok(error_code)
+                                    Ok(error_code)
                                 } else {
-                                    Result::Err(InverterError { message: "Login failed." })
+                                    Err(InverterError { message: "Login failed." })
                                 }
                             } else {
-                                Result::Err(InverterError { message: "Invalid packet id." })
+                                Err(InverterError { message: "Invalid packet id." })
                             }
                         } else {
-                            Result::Err(InverterError { message: "Magic bytes do not match." })
+                            Err(InverterError { message: "Magic bytes do not match." })
                         }
                     } else {
-                        Result::Err(InverterError { message: "Packet length is zero." })
+                        Err(InverterError { message: "Packet length is zero." })
                     }
                 } else {
-                    Result::Err(InverterError { message: "Sent from wrong address." })
+                    Err(InverterError { message: "Sent from wrong address." })
                 }
             }
             Err(err) => {
                 println!("{}", err);
-                Result::Err(InverterError { message: "error" })
+                Err(InverterError { message: "error" })
             }
         }
     }
@@ -266,11 +273,11 @@ impl Inverter {
             }
         }
 
-        let mut buf = [0u8; 1024];
+        let mut buf = [MaybeUninit::new(0 as u8); 1024];
         return match socket.recv_from(buf.as_mut()) {
             Ok((len, remote_addr)) => {
-                if remote_addr.as_std().unwrap().eq(&self.address) {
-                    let mut buffer = ByteBuffer::from_bytes(&buf[0..len]);
+                if remote_addr.as_socket().unwrap().eq(&self.address) {
+                    let mut buffer = ByteBuffer::from_bytes(unsafe { self.assume_init(&buf[0..len]) } );
                     buffer.set_endian(LittleEndian);
                     //L1
                     let l1_magic_number = buffer.read_u32();
@@ -303,7 +310,7 @@ impl Inverter {
                                 if error_code == 0 {
                                     buffer.read_bytes(12);
 
-                                    return Result::Ok(buffer);
+                                    return Ok(buffer);
                                 }
                                 else if error_code == 21 {
                                     Err(InverterError { message: "Unsupported" })
@@ -385,7 +392,7 @@ impl Inverter {
                 }
                 Ok(battery_charge)
             }
-            Err(error) => Result::Err(InverterError { message: error.message })
+            Err(error) => Err(InverterError { message: error.message })
         }
     }
 
@@ -503,9 +510,9 @@ impl Inverter {
                         buffer.read_u32();
                     }
                 }
-                Result::Ok(battery_info)
+                Ok(battery_info)
             }
-            Err(error) => Result::Err(InverterError { message: error.message })
+            Err(error) => Err(InverterError { message: error.message })
         }
     }
 
@@ -562,9 +569,9 @@ impl Inverter {
                         break;
                     }
                 }
-                Result::Ok(dc_info)
+                Ok(dc_info)
             }
-            Err(error) => Result::Err(InverterError { message: error.message })
+            Err(error) => Err(InverterError { message: error.message })
         }
     }
 
@@ -604,11 +611,11 @@ impl Inverter {
                         break;
                     }
                 }
-                Result::Ok(ep_info)
+                Ok(ep_info)
             }
             Err(error) => {
                 println!("Unsupported");
-                Result::Err(InverterError { message: error.message })
+                Err(InverterError { message: error.message })
             }
         }
     }

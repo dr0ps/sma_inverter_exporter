@@ -27,7 +27,7 @@ use tokio::time::Duration;
 const PORT: u16  = 9523;
 
 pub fn initialize_socket(multicast : bool) -> Socket {
-    let socket = Socket::new(Domain::ipv4(), Type::dgram(), Some(Protocol::udp())).unwrap();
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
     socket.set_reuse_address(true).unwrap();
     socket.bind(&SockAddr::from(SocketAddr::new(
         Ipv4Addr::new(0, 0, 0, 0).into(),
