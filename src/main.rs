@@ -1,23 +1,28 @@
 extern crate config;
 
-use lazy_static::lazy_static;
+use crate::inverter::{Inverter};
 use crate::udp_client::initialize_socket;
-use std::io::{Write, Error};
-use std::borrow::{Borrow};
+use config::{Config, File};
+use http_body_util::{BodyExt, combinators::BoxBody, Full};
+use hyper::body::Bytes;
+use hyper::server::conn::http1;
+use hyper::service::service_fn;
+use hyper::{Request, Response};
+use hyper_util::rt::TokioIo;
+use lazy_static::lazy_static;
+use prometheus::{Opts, TextEncoder, Encoder, register, gather, GaugeVec};
+use std::borrow::Borrow;
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::io::{Error, Write};
+use std::mem::MaybeUninit;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, Shutdown};
 use socket2::SockAddr;
-use std::time::Duration;
-use std::thread;
-use std::sync::{Arc, Mutex};
-use crate::inverter::{Inverter};
-use std::collections::HashMap;
-use prometheus::{GaugeVec, TextEncoder, gather, Encoder, Opts, register};
-use hyper::{Response, Request, Body, Server};
-use std::convert::Infallible;
-use std::mem::MaybeUninit;
 use std::process::exit;
-use hyper::service::{make_service_fn, service_fn};
-use config::{Config, File};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+use tokio::net::TcpListener;
 
 mod udp_client;
 mod inverter;
@@ -26,7 +31,7 @@ lazy_static! {
     static ref LOCK: Arc<Mutex<u32>> = Arc::new(Mutex::new(0_u32));
 }
 
-async fn handle(_: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn handle(_: Request<hyper::body::Incoming>) -> Result<Response<BoxBody<Bytes, Infallible>>, hyper::Error> {
     let mut buffer = vec![];
     let encoder = TextEncoder::new();
 
@@ -35,7 +40,11 @@ async fn handle(_: Request<Body>) -> Result<Response<Body>, Infallible> {
     let metric_families = gather();
     encoder.encode(&metric_families, &mut buffer).unwrap();
 
-    Ok(Response::new(String::from_utf8(buffer).unwrap().into()))
+    Ok(Response::new(full(buffer)))
+}
+
+fn full<T: Into<Bytes>>(chunk: T) -> BoxBody<Bytes, Infallible> {
+    Full::new(chunk.into()).boxed()
 }
 
 const BAT_VOLTAGE : &str = "smainverter_battery_voltage_millivolts";
@@ -123,7 +132,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Create a Counter.
     let mut gauges:HashMap<&'static str, GaugeVec> = HashMap::new();
 
@@ -168,11 +177,6 @@ async fn main() {
     gauges.insert(PRODUCTION_DAILY, gauge);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 9745));
-
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infallible>(service_fn(handle))
-    });
-
 
     thread::spawn(move || {
 
@@ -318,9 +322,19 @@ async fn main() {
         }
     });
 
-    let server = Server::bind(&addr).serve(make_svc);
+    let listener = TcpListener::bind(addr).await?;
+    println!("Listening on http://{}", addr);
+    loop {
+        let (stream, _) = listener.accept().await?;
+        let io = TokioIo::new(stream);
 
-    if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
+        tokio::task::spawn(async move {
+            if let Err(err) = http1::Builder::new()
+                .serve_connection(io, service_fn(handle))
+                .await
+            {
+                println!("Error serving connection: {:?}", err);
+            }
+        });
     }
 }

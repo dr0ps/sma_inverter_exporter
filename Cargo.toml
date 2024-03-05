@@ -1,22 +1,24 @@
 [package]
 name = "sma_inverter_exporter"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["dr0ps https://github.com/dr0ps"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prometheus = {version= "0.13.3", features = ["gen"]}
-hyper = { version = "0.14", features = ["full"] }
+prometheus = {version= "0.13", features = ["gen"]}
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
 tokio = { version = "1", features = ["full"] }
 
-socket2 = {version = "0.4.7"}
-bytebuffer-new = "0.2.2"
-rand = "0.8.5"
+socket2 = {version = "0.5"}
+bytebuffer-new = "0.2"
+rand = "0.8"
 lazy_static = "1.4.0"
-config = {version = "0.13.1", features=["ini"]}
+config = {version = "0.14", features=["ini"]}
 
-arc-swap = "1.6.0"
-futures-task ="0.3.7"
-futures-util = "0.3.7"
+arc-swap = "1.7"
+futures-task ="0.3"
+futures-util = "0.3"
