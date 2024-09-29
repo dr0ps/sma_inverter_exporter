@@ -4,7 +4,7 @@ use std::borrow::BorrowMut;
 use std::mem::MaybeUninit;
 use bytebuffer_new::Endian::{BigEndian, LittleEndian};
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::inverter::LRI::{BatChaStt, BatTmpVal, BatAmp, BatVol, DcMsVol, DcMsAmp, MeteringTotWhOut, MeteringDyWhOut};
+use crate::inverter::Lri::{BatChaStt, BatTmpVal, BatAmp, BatVol, DcMsVol, DcMsAmp, MeteringTotWhOut, MeteringDyWhOut};
 use std::net::SocketAddr;
 
 #[derive(Clone)]
@@ -33,7 +33,7 @@ fn gen_serial() -> u32 {
     900000000 + rand::random::<u32>() % 100000000
 }
 
-pub enum LRI {
+pub enum Lri {
     BatChaStt = 0x00295A00,   // *00* Current battery charge status
     DcMsVol = 0x00451F00,   // *40* DC voltage input (aka SPOT_UDC1 / SPOT_UDC2)
     DcMsAmp = 0x00452100,   // *40* DC current input (aka SPOT_IDC1 / SPOT_IDC2)
@@ -67,7 +67,7 @@ impl Inverter {
 
     fn write_packet(&mut self, buffer : &mut ByteBuffer, long_words : u8, control : u8, control_2 : u16)
     {
-        self.packet_id = self.packet_id + 1;
+        self.packet_id += 1;
         buffer.write_u32(0x65601000);
 
         buffer.write_u8(long_words);
@@ -140,8 +140,8 @@ impl Inverter {
         let enc_char = 0x88; //admin:0xbb
         let password_bytes = password.as_bytes();
 
-        for i in 0..password_bytes.len() {
-            buffer.write_u8(password_bytes[i] + enc_char );
+        for byte in password_bytes {
+            buffer.write_u8(byte + enc_char );
         }
         for _i in password_bytes.len()..12 {
             buffer.write_u8(enc_char );
@@ -160,7 +160,7 @@ impl Inverter {
             }
         }
 
-        let mut buf = [MaybeUninit::new(0 as u8); 500];
+        let mut buf = [MaybeUninit::new(0_u8); 500];
         return match socket.recv_from(buf.as_mut()) {
             Ok((len, remote_addr)) => {
                 if remote_addr.as_socket().unwrap().eq(&self.address) {
@@ -273,8 +273,8 @@ impl Inverter {
             }
         }
 
-        let mut buf = [MaybeUninit::new(0 as u8); 1024];
-        return match socket.recv_from(buf.as_mut()) {
+        let mut buf = [MaybeUninit::new(0_u8); 1024];
+        match socket.recv_from(buf.as_mut()) {
             Ok((len, remote_addr)) => {
                 if remote_addr.as_socket().unwrap().eq(&self.address) {
                     let mut buffer = ByteBuffer::from_bytes(unsafe { self.assume_init(&buf[0..len]) } );
@@ -310,7 +310,7 @@ impl Inverter {
                                 if error_code == 0 {
                                     buffer.read_bytes(12);
 
-                                    return Ok(buffer);
+                                    Ok(buffer)
                                 }
                                 else if error_code == 21 {
                                     Err(InverterError { message: "Unsupported" })
@@ -344,7 +344,7 @@ impl Inverter {
 
     pub fn get_battery_charge_status(&mut self, socket: &Socket) -> Result<[u8;3], InverterError>
     {
-        return match self.get_data(socket, &Inverter::BATTERY_CHARGE_STATUS) {
+        match self.get_data(socket, &Inverter::BATTERY_CHARGE_STATUS) {
             Ok(mut buffer) => {
 
                 let mut battery_charge:[u8;3] = [0,0,0];
@@ -398,7 +398,7 @@ impl Inverter {
 
     pub fn get_battery_info(&mut self, socket: &Socket) -> Result<BatteryInfo, InverterError>
     {
-        return match self.get_data(socket, &Inverter::BATTERY_INFO) {
+        match self.get_data(socket, &Inverter::BATTERY_INFO) {
             Ok(mut buffer) => {
                 let mut battery_info = BatteryInfo { temperature: [0,0,0], voltage: [0,0,0], current: [0,0,0] };
 
@@ -518,7 +518,7 @@ impl Inverter {
 
     pub fn get_dc_voltage(&mut self, socket: &Socket) -> Result<DCInfo, InverterError>
     {
-        return match self.get_data(socket, &Inverter::SPOT_DC_VOLTAGE) {
+        match self.get_data(socket, &Inverter::SPOT_DC_VOLTAGE) {
             Ok(mut buffer) => {
 
                 let mut dc_info = DCInfo{voltage: [0,0], current: [0,0]};
@@ -577,7 +577,7 @@ impl Inverter {
 
     pub fn get_energy_production(&mut self, socket: &Socket) -> Result<EnergyProductionInfo, InverterError>
     {
-        return match self.get_data(socket, &Inverter::ENERGY_PRODUCTION) {
+        match self.get_data(socket, &Inverter::ENERGY_PRODUCTION) {
             Ok(mut buffer) => {
 
                 let mut ep_info = EnergyProductionInfo{daily_wh: 0, total_wh: 0};

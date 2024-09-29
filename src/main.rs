@@ -91,7 +91,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     }
 
     let mut inverters = Vec::new();
-    let mut buf = [MaybeUninit::new(0 as u8); 65];
+    let mut buf = [MaybeUninit::new(0_u8); 65];
     match socket.set_read_timeout(Some(Duration::from_millis(100)))
     {
         Ok(_x) => {
@@ -195,16 +195,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let builder = Config::builder()
                     .add_source(File::with_name("/etc/sma_inverter_exporter.ini"));
 
-                let settings;
-                match builder.build() {
+                let settings= match builder.build() {
                     Err(error) => {
                         println!("Config error: {}", error);
                         exit(1);
                     }
                     Ok(config) => {
-                        settings = config;
+                        config
                     }
-                }
+                };
 
                 let inverters = match find_inverters() {
                     Ok(found_inverters) => {
@@ -218,7 +217,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                 socket = initialize_socket(false);
 
-                for mut i in inverters.to_vec() {
+                for mut i in inverters.iter().cloned() {
                     let pass_key = format!("{}{}", &i.address.ip().to_string(), ".password");
                     let password = settings.get_string(pass_key.as_str()).unwrap_or("0000".to_string());
                     match i.login(&socket,  password.as_str()) {
@@ -232,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 }
             }
 
-            counter = counter+1;
+            counter += 1;
             if counter >= 60
             {
                 counter = 0;
@@ -259,12 +258,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 match i.get_battery_info(&socket)  {
                     Ok(data) => {
                         let _lock = LOCK.lock().unwrap();
-                        gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["A"]).set(data.temperature[0] as f64 / 10 as f64);
-                        gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["B"]).set(data.temperature[1] as f64 / 10 as f64);
-                        gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["C"]).set(data.temperature[2] as f64 / 10 as f64);
-                        gauges.get(BAT_VOLTAGE).unwrap().with_label_values(&["A"]).set(data.voltage[0] as f64 * 10 as f64);
-                        gauges.get(BAT_VOLTAGE).unwrap().with_label_values(&["B"]).set(data.voltage[1] as f64 * 10 as f64);
-                        gauges.get(BAT_VOLTAGE).unwrap().with_label_values(&["C"]).set(data.voltage[2] as f64 * 10 as f64);
+                        gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["A"]).set(data.temperature[0] as f64 / 10_f64);
+                        gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["B"]).set(data.temperature[1] as f64 / 10_f64);
+                        gauges.get(BAT_TEMPERATURE).unwrap().with_label_values(&["C"]).set(data.temperature[2] as f64 / 10_f64);
+                        gauges.get(BAT_VOLTAGE).unwrap().with_label_values(&["A"]).set(data.voltage[0] as f64 * 10_f64);
+                        gauges.get(BAT_VOLTAGE).unwrap().with_label_values(&["B"]).set(data.voltage[1] as f64 * 10_f64);
+                        gauges.get(BAT_VOLTAGE).unwrap().with_label_values(&["C"]).set(data.voltage[2] as f64 * 10_f64);
                         gauges.get(BAT_CURRENT).unwrap().with_label_values(&["A"]).set(data.current[0] as f64);
                         gauges.get(BAT_CURRENT).unwrap().with_label_values(&["B"]).set(data.current[1] as f64);
                         gauges.get(BAT_CURRENT).unwrap().with_label_values(&["C"]).set(data.current[2] as f64);
@@ -280,8 +279,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     Ok(data) => {
                         gauges.get(DC_CURRENT).unwrap().with_label_values(&["1"]).set(data.current[0] as f64);
                         gauges.get(DC_CURRENT).unwrap().with_label_values(&["2"]).set(data.current[1] as f64);
-                        gauges.get(DC_VOLTAGE).unwrap().with_label_values(&["1"]).set(data.voltage[0] as f64 * 10 as f64);
-                        gauges.get(DC_VOLTAGE).unwrap().with_label_values(&["2"]).set(data.voltage[1] as f64 * 10 as f64);
+                        gauges.get(DC_VOLTAGE).unwrap().with_label_values(&["1"]).set(data.voltage[0] as f64 * 10_f64);
+                        gauges.get(DC_VOLTAGE).unwrap().with_label_values(&["2"]).set(data.voltage[1] as f64 * 10_f64);
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported")
