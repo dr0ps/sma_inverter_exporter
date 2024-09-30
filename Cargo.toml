@@ -16,7 +16,7 @@ tokio = { version = "1", features = ["full"] }
 socket2 = {version = "0.5"}
 bytebuffer-new = "0.2"
 rand = "0.8"
-lazy_static = "1.4.0"
+lazy_static = "1.5"
 config = {version = "0.14", features=["ini"]}
 
 arc-swap = "1.7"
