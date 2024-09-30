@@ -161,7 +161,7 @@ impl Inverter {
         }
 
         let mut buf = [MaybeUninit::new(0_u8); 500];
-        return match socket.recv_from(buf.as_mut()) {
+        match socket.recv_from(buf.as_mut()) {
             Ok((len, remote_addr)) => {
                 if remote_addr.as_socket().unwrap().eq(&self.address) {
                     let mut buffer = ByteBuffer::from_bytes(unsafe { self.assume_init(&buf[0..len]) } );

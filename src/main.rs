@@ -20,7 +20,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, Shutdown};
 use socket2::SockAddr;
 use std::process::exit;
 use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{mem, thread};
 use std::time::Duration;
 use tokio::net::TcpListener;
 
@@ -55,10 +55,6 @@ const DC_VOLTAGE : &str = "smainverter_spot_dc_voltage_millivolts";
 const DC_CURRENT : &str = "smainverter_spot_dc_current_milliamperes";
 const PRODUCTION_TOTAL : &str = "smainverter_metering_total_watthours";
 const PRODUCTION_DAILY : &str = "smainverter_metering_daily_watthours";
-
-unsafe fn assume_init(buf: &[MaybeUninit<u8>]) -> &[u8] {
-    &*(buf as *const [MaybeUninit<u8>] as *const [u8])
-}
 
 fn find_inverters() -> Result<Vec<Inverter>, Error> {
 
@@ -108,7 +104,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
         match socket.recv_from(&mut buf) {
             Ok((len, remote_addr)) => {
                 if len == 65 {
-                    let ibuf = unsafe { assume_init(&buf) };
+                    let ibuf = unsafe { mem::transmute::<[MaybeUninit<u8>; 65], [u8; 65]>(buf) };
                     if remote_addr.as_socket_ipv4().unwrap().eq(&SocketAddrV4::new(Ipv4Addr::new(ibuf[38], ibuf[39], ibuf[40], ibuf[41]), 9522)) {
                         println!("found {}.{}.{}.{}", ibuf[38], ibuf[39], ibuf[40], ibuf[41]);
                         inverters.push(Inverter::new(remote_addr.as_socket().unwrap()))
