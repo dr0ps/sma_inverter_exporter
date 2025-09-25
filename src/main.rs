@@ -171,7 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     register(Box::new(gauge.borrow().clone())).unwrap();
     gauges.insert(PRODUCTION_DAILY, gauge);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 9745));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 9745));
 
     thread::spawn(move || {
         let mut counter = 0;
