@@ -4,7 +4,7 @@ This creates a single binary which exports values from SMA Inverters (both PV an
 
 ## Getting Started
 
-You can download a build from the [release page](https://github.com/dr0ps/sma_inverter_exporter/releases/latest). When run it will create a http server running on port 9745 where it exports data for panel voltage and current, battery voltage and current and battery charge.
+You can download a build from the [release page](https://github.com/dr0ps/sma_inverter_exporter/releases/latest). When run it will create a http server running on port 9756 where it exports data for panel voltage and current, battery voltage and current and battery charge.
 
 ### Building from Source
 
