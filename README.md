@@ -21,12 +21,12 @@ and if that works for you (point your browser to http://localhost:9745) you can 
 Optionally you can create a config file. You will need to do this if your inverter passwords are not "0000". 
 Currently the config file needs to be placed at /etc/sma_inverter_exporter.ini and it should contain one row per inverter:
  ```
- [inverter ip address]=[password]
+ [inverter ip address].password=[password]
  ```
 for example with two inverters it would look like this:
  ```
-192.168.1.101=s3cr3t
-192.168.1.102=h4x0r
+192.168.1.101.password=s3cr3t
+192.168.1.102.password=h4x0r
  ```
 (Those are bad password, do not use those anywhere!)
 
