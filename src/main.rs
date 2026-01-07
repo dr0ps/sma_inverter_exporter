@@ -185,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 logged_in_inverters.clear();
 
                 let builder =
-                    Config::builder().add_source(File::with_name("/etc/sma_inverter_exporter.ini"));
+                    Config::builder().add_source(File::with_name("/etc/sma_inverter_exporter.ini").required(false));
 
                 let settings = match builder.build() {
                     Err(error) => {
