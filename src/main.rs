@@ -23,9 +23,19 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{mem, thread};
 use tokio::net::TcpListener;
+use clap::Parser;
 
 mod inverter;
 mod udp_client;
+
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Source port for UDP socket
+    #[arg(short, long, default_value_t = 9523)]
+    src_port: u16,
+}
 
 lazy_static! {
     static ref LOCK: Arc<Mutex<u32>> = Arc::new(Mutex::new(0_u32));
@@ -58,8 +68,8 @@ const DC_CURRENT: &str = "smainverter_spot_dc_current_milliamperes";
 const PRODUCTION_TOTAL: &str = "smainverter_metering_total_watthours";
 const PRODUCTION_DAILY: &str = "smainverter_metering_daily_watthours";
 
-fn find_inverters() -> Result<Vec<Inverter>, Error> {
-    let mut socket = initialize_socket(true);
+fn find_inverters(src_port: u16) -> Result<Vec<Inverter>, Error> {
+    let mut socket = initialize_socket(true, src_port);
     match socket.send_to(
         [
             0x53, 0x4D, 0x41, 0x00, 0x00, 0x04, 0x02, 0xA0, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00,
@@ -128,6 +138,10 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+
+    let args = Args::parse();
+    let src_port = args.src_port;
+
     // Create a Counter.
     let mut gauges: HashMap<&'static str, GaugeVec> = HashMap::new();
 
@@ -175,7 +189,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     thread::spawn(move || {
         let mut counter = 0;
-        let mut socket = initialize_socket(false);
+        let mut socket = initialize_socket(false, src_port);
 
         let mut logged_in_inverters: Vec<Inverter> = Vec::new();
 
@@ -195,7 +209,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     Ok(config) => config,
                 };
 
-                let inverters = match find_inverters() {
+                let inverters = match find_inverters(src_port) {
                     Ok(found_inverters) => found_inverters,
                     Err(err) => {
                         println!("Error while finding inverters: {}", err);
@@ -203,7 +217,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 };
 
-                socket = initialize_socket(false);
+                socket = initialize_socket(false, src_port);
 
                 for mut i in inverters.iter().cloned() {
                     let pass_key = format!("{}{}", &i.address.ip().to_string(), ".password");

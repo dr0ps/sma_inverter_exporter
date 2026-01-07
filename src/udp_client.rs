@@ -23,16 +23,14 @@ use tokio::time::Duration;
  *
  */
 
-//default values
-const PORT: u16 = 9523;
 
-pub fn initialize_socket(multicast: bool) -> Socket {
+pub fn initialize_socket(multicast: bool, src_port: u16) -> Socket {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
     socket.set_reuse_address(true).unwrap();
     socket
         .bind(&SockAddr::from(SocketAddr::new(
             Ipv4Addr::new(0, 0, 0, 0).into(),
-            PORT,
+            src_port,
         )))
         .unwrap();
     match socket.set_read_timeout(Some(Duration::from_secs(1))) {

@@ -18,3 +18,4 @@ bytebuffer-new = "0.2"
 rand = "0.9"
 lazy_static = "1.5"
 config = {version = "0.15", features=["ini"]}
+clap = { version = "4.5.54", features = ["derive"] }
