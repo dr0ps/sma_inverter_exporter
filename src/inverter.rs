@@ -451,7 +451,7 @@ impl Inverter {
                     current: [0, 0, 0],
                 };
 
-                while buffer.len() > buffer.get_rpos() {
+                while buffer.len() >= buffer.get_rpos()+(7*4) {
                     let code = buffer.read_u32();
                     if code == 0 {
                         return Ok(battery_info);
@@ -566,7 +566,7 @@ impl Inverter {
                     current: [0, 0],
                 };
 
-                while buffer.len() > buffer.get_rpos() {
+                while buffer.len() >= buffer.get_rpos()+(7*4) {
                     let code = buffer.read_u32();
                     if code == 0 {
                         return Ok(dc_info);
