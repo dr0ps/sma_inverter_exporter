@@ -4,6 +4,8 @@ use self::socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::time::Duration;
 
+use log::info;
+
 /*
  *
  * by dr0ps 2020-Jul-18
@@ -38,7 +40,7 @@ pub fn initialize_socket(multicast: bool) -> Socket {
     match socket.set_read_timeout(Some(Duration::from_secs(1))) {
         Ok(()) => {}
         Err(error) => {
-            println!("Unable to set socket timeout {}", error);
+            info!("Unable to set socket timeout {}", error);
         }
     }
 

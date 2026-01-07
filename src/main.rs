@@ -23,12 +23,81 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::{mem, thread};
 use tokio::net::TcpListener;
+use clap::{ArgAction, Parser};
+
+use log::info;
+use fern::colors::{Color, ColoredLevelConfig};
+use std::time::SystemTime;
 
 mod inverter;
 mod udp_client;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Turn debugging information on (multiple times increases the level)
+    #[arg(short, long, action = ArgAction::Count, default_value_t = 2)]
+    verbosity: u8, // The type should be an integer to store the count
+}
+
 lazy_static! {
     static ref LOCK: Arc<Mutex<u32>> = Arc::new(Mutex::new(0_u32));
+}
+
+fn setup_logging(verbosity: u8) -> Result<(), fern::InitError> {
+    let colors_line = ColoredLevelConfig::new()
+        .error(Color::Red)
+        .warn(Color::Yellow)
+        .info(Color::White)
+        .debug(Color::White)
+        .trace(Color::BrightBlack);
+
+    let colors_level = colors_line.info(Color::Green);
+
+    let mut base_config = fern::Dispatch::new();
+
+    base_config = match verbosity {
+        0 => base_config
+            // .level(log::LevelFilter::Info),
+            .level_for("sma_inverter_exporter", log::LevelFilter::Error),
+        1 => base_config
+            // .level(log::LevelFilter::Warn),
+            .level_for("sma_inverter_exporter", log::LevelFilter::Warn),
+        2 => base_config
+            // .level(log::LevelFilter::Debug),
+            .level_for("sma_inverter_exporter", log::LevelFilter::Info),
+        3 => base_config
+            // .level(log::LevelFilter::Trace),
+            .level_for("sma_inverter_exporter", log::LevelFilter::Debug),
+        _4_or_more => base_config
+            // .level(log::LevelFilter::Trace),
+            .level_for("sma_inverter_exporter", log::LevelFilter::Trace),
+    };
+
+    let stdout_config = fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "{color_line}[{date} {level} {target} {file}:{line} {color_line}] {message}\x1B[0m",
+                color_line = format_args!(
+                    "\x1B[{}m",
+                    colors_line.get_color(&record.level()).to_fg_str()
+                ),
+                date = humantime::format_rfc3339_seconds(SystemTime::now()),
+                target = record.target(),
+                file = record.file().unwrap_or("Unknown"),
+                line = record.line().unwrap_or(0),
+                level = colors_level.color(record.level()),
+                message = message,
+            ));
+        })
+        .level(log::LevelFilter::Info)
+        .chain(std::io::stdout());
+
+    base_config
+        .chain(stdout_config)
+        .apply()?;
+
+    Ok(())
 }
 
 async fn handle(
@@ -73,7 +142,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     ) {
         Ok(_size) => {}
         Err(err) => {
-            println!("{}", err);
+            info!("{}", err);
             return Err(err);
         }
     }
@@ -82,7 +151,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
         Ok(_x) => {}
 
         Err(err) => {
-            println!("{}", err);
+            info!("{}", err);
             return Err(err);
         }
     }
@@ -93,7 +162,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
         Ok(_x) => {}
 
         Err(err) => {
-            println!("{}", err);
+            info!("{}", err);
             return Err(err);
         }
     }
@@ -107,7 +176,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
                         Ipv4Addr::new(ibuf[38], ibuf[39], ibuf[40], ibuf[41]),
                         9522,
                     )) {
-                        println!("found {}.{}.{}.{}", ibuf[38], ibuf[39], ibuf[40], ibuf[41]);
+                        info!("found {}.{}.{}.{}", ibuf[38], ibuf[39], ibuf[40], ibuf[41]);
                         inverters.push(Inverter::new(remote_addr.as_socket().unwrap()))
                     }
                 }
@@ -120,7 +189,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     match socket.shutdown(Shutdown::Both) {
         Ok(_result) => {}
         Err(error) => {
-            println!("Unable to shutdown socket. {}", error);
+            info!("Unable to shutdown socket. {}", error);
         }
     }
     Ok(inverters)
@@ -128,6 +197,11 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let args = Args::parse();
+    let verbosity = args.verbosity;
+
+    setup_logging(verbosity).expect("failed to initialize logging.");
+
     // Create a Counter.
     let mut gauges: HashMap<&'static str, GaugeVec> = HashMap::new();
 
@@ -189,7 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                 let settings = match builder.build() {
                     Err(error) => {
-                        println!("Config error: {}", error);
+                        info!("Config error: {}", error);
                         exit(1);
                     }
                     Ok(config) => config,
@@ -198,7 +272,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let inverters = match find_inverters() {
                     Ok(found_inverters) => found_inverters,
                     Err(err) => {
-                        println!("Error while finding inverters: {}", err);
+                        info!("Error while finding inverters: {}", err);
                         Vec::new()
                     }
                 };
@@ -215,7 +289,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             logged_in_inverters.push(i);
                         }
                         Err(inverter_error) => {
-                            println!("Inverter {} error: {}", i.address, inverter_error.message);
+                            info!("Inverter {} error: {}", i.address, inverter_error.message);
                         }
                     }
                 }
@@ -234,12 +308,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 match socket.shutdown(Shutdown::Both) {
                     Ok(_result) => {}
                     Err(error) => {
-                        println!("Unable to shutdown socket. {}", error);
+                        info!("Unable to shutdown socket. {}", error);
                     }
                 }
             }
 
-            print!("Getting data: ");
+            info!("Getting data: ");
             for i in &mut logged_in_inverters {
                 print!("inverter {}, ", &i.address.ip().to_string());
                 match i.get_battery_info(&socket) {
@@ -293,7 +367,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            info!("Inverter error: {}", inverter_error.message);
                         }
                     }
                 }
@@ -322,7 +396,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            info!("Inverter error: {}", inverter_error.message);
                         }
                     }
                 }
@@ -347,7 +421,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            info!("Inverter error: {}", inverter_error.message);
                         }
                     }
                 }
@@ -367,17 +441,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            info!("Inverter error: {}", inverter_error.message);
                         }
                     }
                 }
             }
-            println!("done.");
+            info!("done.");
         }
     });
 
     let listener = TcpListener::bind(addr).await?;
-    println!("Listening on http://{}", addr);
+    info!("Listening on http://{}", addr);
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
@@ -387,7 +461,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 .serve_connection(io, service_fn(handle))
                 .await
             {
-                println!("Error serving connection: {:?}", err);
+                info!("Error serving connection: {:?}", err);
             }
         });
     }

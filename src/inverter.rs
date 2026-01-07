@@ -9,6 +9,8 @@ use std::mem::MaybeUninit;
 use std::net::SocketAddr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use log::info;
+
 #[derive(Clone)]
 pub struct Inverter {
     pub address: SocketAddr,
@@ -165,7 +167,7 @@ impl Inverter {
         match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
             Ok(_result) => {}
             Err(error) => {
-                println!("{}", error);
+                info!("{}", error);
             }
         }
 
@@ -236,7 +238,7 @@ impl Inverter {
                 }
             }
             Err(err) => {
-                println!("{}", err);
+                info!("{}", err);
                 Err(InverterError { message: "error" })
             }
         }
@@ -259,7 +261,7 @@ impl Inverter {
         match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
             Ok(_result) => {}
             Err(error) => {
-                println!("{}", error);
+                info!("{}", error);
             }
         }
     }
@@ -306,7 +308,7 @@ impl Inverter {
         match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
             Ok(_result) => {}
             Err(error) => {
-                println!("{}", error);
+                info!("{}", error);
             }
         }
 
@@ -382,7 +384,7 @@ impl Inverter {
                 }
             }
             Err(err) => {
-                println!("{}", err);
+                info!("{}", err);
                 Err(InverterError { message: "Error" })
             }
         }
@@ -532,7 +534,7 @@ impl Inverter {
                     } else if lri == BatVol as u32 && battery_info.voltage[2] == 0 {
                         let _date = buffer.read_u32();
                         let mut value = buffer.read_u32();
-                        println!("Value: {:x}", value);
+                        info!("Value: {:x}", value);
                         if value == 65535 {
                             value = 0;
                         }
@@ -607,7 +609,7 @@ impl Inverter {
                         buffer.read_u32();
                         buffer.read_u32();
                     } else {
-                        println!("unhandled (dc voltage): {:x}", lri);
+                        info!("unhandled (dc voltage): {:x}", lri);
                         break;
                     }
                 }
@@ -654,14 +656,14 @@ impl Inverter {
                         buffer.read_u32();
                         buffer.read_u32();
                     } else {
-                        println!("unhandled (energy production): {:x}", lri);
+                        info!("unhandled (energy production): {:x}", lri);
                         break;
                     }
                 }
                 Ok(ep_info)
             }
             Err(error) => {
-                println!("Unsupported");
+                info!("Unsupported");
                 Err(InverterError {
                     message: error.message,
                 })

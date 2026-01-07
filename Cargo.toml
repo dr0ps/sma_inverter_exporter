@@ -18,3 +18,7 @@ bytebuffer-new = "0.2"
 rand = "0.9"
 lazy_static = "1.5"
 config = {version = "0.15", features=["ini"]}
+log = "0.4.29"
+fern = { version = "0.7", features = ["colored"] }
+humantime = "2.3.0"
+clap = { version = "4.5.54", features = ["derive"] }
