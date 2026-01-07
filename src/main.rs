@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::io::{Error, Write};
 use std::mem::MaybeUninit;
-use std::net::{Ipv4Addr, Shutdown, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, Shutdown, SocketAddr};
 use std::process::exit;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -58,6 +58,17 @@ const DC_CURRENT: &str = "smainverter_spot_dc_current_milliamperes";
 const PRODUCTION_TOTAL: &str = "smainverter_metering_total_watthours";
 const PRODUCTION_DAILY: &str = "smainverter_metering_daily_watthours";
 
+fn is_discovery_response(response_packet: &[u8]) -> bool {
+    // Discovery response packet as per https://cdn.sma.de/fileadmin/content/www.developer.sma.de/docs/SpeedwireDD-TI-en-10.pdf?v=1699275967
+    let discovery_response = [
+        0x53, 0x4d, 0x41, 0x00, 0x00, 0x04, 0x02, 0xA0,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00,
+        0x00, 0x01,
+    ];
+
+    response_packet.starts_with(&discovery_response)
+}
+
 fn find_inverters() -> Result<Vec<Inverter>, Error> {
     let mut socket = initialize_socket(true);
     match socket.send_to(
@@ -88,7 +99,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     }
 
     let mut inverters = Vec::new();
-    let mut buf = [MaybeUninit::new(0_u8); 65];
+    let mut buf = [MaybeUninit::new(0_u8); 18];
     match socket.set_read_timeout(Some(Duration::from_millis(100))) {
         Ok(_x) => {}
 
@@ -101,13 +112,10 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     while readable {
         match socket.recv_from(&mut buf) {
             Ok((len, remote_addr)) => {
-                if len == 65 {
-                    let ibuf = unsafe { mem::transmute::<[MaybeUninit<u8>; 65], [u8; 65]>(buf) };
-                    if remote_addr.as_socket_ipv4().unwrap().eq(&SocketAddrV4::new(
-                        Ipv4Addr::new(ibuf[38], ibuf[39], ibuf[40], ibuf[41]),
-                        9522,
-                    )) {
-                        println!("found {}.{}.{}.{}", ibuf[38], ibuf[39], ibuf[40], ibuf[41]);
+                if len == 18 {
+                    let ibuf = unsafe { mem::transmute::<[MaybeUninit<u8>; 18], [u8; 18]>(buf) };
+                    if is_discovery_response(&ibuf) {
+                        println!("found {}", remote_addr.as_socket().unwrap());
                         inverters.push(Inverter::new(remote_addr.as_socket().unwrap()))
                     }
                 }
