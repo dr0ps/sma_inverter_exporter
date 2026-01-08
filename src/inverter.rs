@@ -521,7 +521,7 @@ impl Inverter {
                     } else if lri == BatVol as u32 && battery_info.voltage[1] == 0 {
                         let _date = buffer.read_u32();
                         let mut value = buffer.read_u32();
-                        if value == 0xffffffff {
+                        if value == 65535 {
                             value = 0;
                         }
                         battery_info.voltage[1] = value as u16;
@@ -532,7 +532,6 @@ impl Inverter {
                     } else if lri == BatVol as u32 && battery_info.voltage[2] == 0 {
                         let _date = buffer.read_u32();
                         let mut value = buffer.read_u32();
-                        println!("Value: {:x}", value);
                         if value == 65535 {
                             value = 0;
                         }
@@ -661,7 +660,6 @@ impl Inverter {
                 Ok(ep_info)
             }
             Err(error) => {
-                println!("Unsupported");
                 Err(InverterError {
                     message: error.message,
                 })
