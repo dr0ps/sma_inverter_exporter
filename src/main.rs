@@ -26,6 +26,7 @@ use tokio::net::TcpListener;
 
 mod inverter;
 mod udp_client;
+mod log;
 
 lazy_static! {
     static ref LOCK: Arc<Mutex<u32>> = Arc::new(Mutex::new(0_u32));
@@ -84,7 +85,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     ) {
         Ok(_size) => {}
         Err(err) => {
-            println!("{}", err);
+            log!(format!("{}", err));
             return Err(err);
         }
     }
@@ -93,7 +94,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
         Ok(_x) => {}
 
         Err(err) => {
-            println!("{}", err);
+            log!(format!("{}", err));
             return Err(err);
         }
     }
@@ -104,7 +105,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
         Ok(_x) => {}
 
         Err(err) => {
-            println!("{}", err);
+            log!(format!("{}", err));
             return Err(err);
         }
     }
@@ -128,7 +129,7 @@ fn find_inverters() -> Result<Vec<Inverter>, Error> {
     match socket.shutdown(Shutdown::Both) {
         Ok(_result) => {}
         Err(error) => {
-            println!("Unable to shutdown socket. {}", error);
+            log!(format!("Unable to shutdown socket. {}", error));
         }
     }
     Ok(inverters)
@@ -197,7 +198,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                 let settings = match builder.build() {
                     Err(error) => {
-                        println!("Config error: {}", error);
+                        log!(format!("Config error: {}", error));
                         exit(1);
                     }
                     Ok(config) => config,
@@ -206,7 +207,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let inverters = match find_inverters() {
                     Ok(found_inverters) => found_inverters,
                     Err(err) => {
-                        println!("Error while finding inverters: {}", err);
+                        log!(format!("Error while finding inverters: {}", err));
                         Vec::new()
                     }
                 };
@@ -223,7 +224,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             logged_in_inverters.push(i);
                         }
                         Err(inverter_error) => {
-                            println!("Inverter {} error: {}", i.address, inverter_error.message);
+                            log!(format!("Inverter {} error: {}", i.address, inverter_error.message));
                         }
                     }
                 }
@@ -242,14 +243,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 match socket.shutdown(Shutdown::Both) {
                     Ok(_result) => {}
                     Err(error) => {
-                        println!("Unable to shutdown socket. {}", error);
+                        log!(format!("Unable to shutdown socket. {}", error));
                     }
                 }
             }
 
-            print!("Getting data: ");
+            log!("Getting data from inverters: ");
             for i in &mut logged_in_inverters {
-                print!("inverter {}, ", &i.address.ip().to_string());
+                log!(format!("Getting data from inverter {}.", &i.address.ip().to_string()));
                 match i.get_battery_info(&socket) {
                     Ok(data) => {
                         let _lock = LOCK.lock().unwrap();
@@ -301,7 +302,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            log!(format!("[{}] Unable to get battery info from inverter. {}",
+                                &i.address.ip().to_string(), inverter_error.message));
                         }
                     }
                 }
@@ -330,7 +332,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            log!(format!("[{}] Unable to get DC voltage from inverter. {}",
+                                &i.address.ip().to_string(), inverter_error.message));
                         }
                     }
                 }
@@ -355,7 +358,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            log!(format!("Inverter error: {}", inverter_error.message));
                         }
                     }
                 }
@@ -375,17 +378,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                     Err(inverter_error) => {
                         if inverter_error.message.ne("Unsupported") {
-                            println!("Inverter error: {}", inverter_error.message);
+                            log!(format!("[{}] Unable to get energy production from inverter. {}",
+                                &i.address.ip().to_string(), inverter_error.message));
                         }
                     }
                 }
             }
-            println!("done.");
+            log!("Finished getting data from all inverters.");
         }
     });
 
     let listener = TcpListener::bind(addr).await?;
-    println!("Listening on http://{}", addr);
+    log!(format!("Listening on http://{}", addr));
     loop {
         let (stream, _) = listener.accept().await?;
         let io = TokioIo::new(stream);
@@ -393,9 +397,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         tokio::task::spawn(async move {
             if let Err(err) = http1::Builder::new()
                 .serve_connection(io, service_fn(handle))
-                .await
-            {
-                println!("Error serving connection: {:?}", err);
+                .await {
+                log!(format!("Error serving connection: {:?}", err));
             }
         });
     }

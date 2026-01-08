@@ -4,6 +4,8 @@ use self::socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::time::Duration;
 
+use crate::log;
+
 pub fn initialize_socket(multicast: bool) -> Socket {
     let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
     socket.set_reuse_address(true).unwrap();
@@ -16,7 +18,7 @@ pub fn initialize_socket(multicast: bool) -> Socket {
     match socket.set_read_timeout(Some(Duration::from_secs(1))) {
         Ok(()) => {}
         Err(error) => {
-            println!("Unable to set socket timeout {}", error);
+            log!(format!("Unable to set socket timeout {}", error));
         }
     }
 
