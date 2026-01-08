@@ -56,6 +56,8 @@ const BAT_CHARGE: &str = "smainverter_battery_charge_percentage";
 const BAT_TEMPERATURE: &str = "smainverter_battery_temperature_degreescelsius";
 const DC_VOLTAGE: &str = "smainverter_spot_dc_voltage_millivolts";
 const DC_CURRENT: &str = "smainverter_spot_dc_current_milliamperes";
+const AC_VOLTAGE: &str = "smainverter_spot_ac_voltage_millivolts";
+const AC_CURRENT: &str = "smainverter_spot_ac_current_milliamperes";
 const PRODUCTION_TOTAL: &str = "smainverter_metering_total_watthours";
 const PRODUCTION_DAILY: &str = "smainverter_metering_daily_watthours";
 
@@ -174,6 +176,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gauge = GaugeVec::new(gauge_opts, &["inverter"]).unwrap();
     register(Box::new(gauge.borrow().clone())).unwrap();
     gauges.insert(PRODUCTION_TOTAL, gauge);
+
+    let gauge_opts = Opts::new(AC_VOLTAGE, "Spot AC voltage");
+    let gauge = GaugeVec::new(gauge_opts, &["line"]).unwrap();
+    register(Box::new(gauge.borrow().clone())).unwrap();
+    gauges.insert(AC_VOLTAGE, gauge);
+
+    let gauge_opts = Opts::new(AC_CURRENT, "Spot AC current");
+    let gauge = GaugeVec::new(gauge_opts, &["line"]).unwrap();
+    register(Box::new(gauge.borrow().clone())).unwrap();
+    gauges.insert(AC_CURRENT, gauge);
 
     let gauge_opts = Opts::new(PRODUCTION_DAILY, "Daily Production");
     let gauge = GaugeVec::new(gauge_opts, &["inverter"]).unwrap();
@@ -334,6 +346,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         if inverter_error.message.ne("Unsupported") {
                             log!(format!("[{}] Unable to get DC voltage from inverter. {}",
                                 &i.address.ip().to_string(), inverter_error.message));
+                        }
+                    }
+                }
+                match i.get_ac_voltage(socket.borrow()) {
+                    Ok(data) => {
+                        gauges
+                            .get(AC_CURRENT)
+                            .unwrap()
+                            .with_label_values(&["1"])
+                            .set(data.current[0] as f64);
+                        gauges
+                            .get(AC_CURRENT)
+                            .unwrap()
+                            .with_label_values(&["2"])
+                            .set(data.current[1] as f64);
+                        gauges
+                            .get(AC_CURRENT)
+                            .unwrap()
+                            .with_label_values(&["3"])
+                            .set(data.current[2] as f64);
+                        gauges
+                            .get(AC_VOLTAGE)
+                            .unwrap()
+                            .with_label_values(&["1"])
+                            .set(data.voltage[0] as f64 * 10_f64);
+                        gauges
+                            .get(AC_VOLTAGE)
+                            .unwrap()
+                            .with_label_values(&["2"])
+                            .set(data.voltage[1] as f64 * 10_f64);
+                        gauges
+                            .get(AC_VOLTAGE)
+                            .unwrap()
+                            .with_label_values(&["3"])
+                            .set(data.voltage[2] as f64 * 10_f64);
+                    }
+                    Err(inverter_error) => {
+                        if inverter_error.message.ne("Unsupported") {
+                            println!("Inverter error: {}", inverter_error.message);
                         }
                     }
                 }

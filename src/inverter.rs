@@ -1,5 +1,9 @@
 use crate::inverter::Lri::{
-    BatAmp, BatChaStt, BatTmpVal, BatVol, DcMsAmp, DcMsVol, MeteringDyWhOut, MeteringTotWhOut,
+    BatAmp, BatChaStt, BatTmpVal, BatVol,
+    DcMsAmp, DcMsVol,
+    AcMsVol0, AcMsVol1, AcMsVol2,
+    AcMsAmp0, AcMsAmp1, AcMsAmp2,
+    MeteringDyWhOut, MeteringTotWhOut,
 };
 
 use crate::log;
@@ -40,11 +44,22 @@ fn gen_serial() -> u32 {
 
 pub enum Lri {
     BatChaStt = 0x00295A00,        // *00* Current battery charge status
+
     DcMsVol = 0x00451F00,          // *40* DC voltage input (aka SPOT_UDC1 / SPOT_UDC2)
     DcMsAmp = 0x00452100,          // *40* DC current input (aka SPOT_IDC1 / SPOT_IDC2)
+
+    AcMsVol0 = 0x00464800,         // *40* AC voltage input (aka SPOT_UAC1)
+    AcMsVol1 = 0x00464900,         // *40* AC voltage input (aka SPOT_UAC2)
+    AcMsVol2 = 0x00464A00,         // *40* AC voltage input (aka SPOT_UAC3)
+
+    AcMsAmp0 = 0x00465300,         // *40* AC current input (aka SPOT_IAC1)
+    AcMsAmp1 = 0x00465400,         // *40* AC current input (aka SPOT_IAC2)
+    AcMsAmp2 = 0x00465500,         // *40* AC current input (aka SPOT_IAC3)
+
     BatTmpVal = 0x00495B00,        // *40* Battery temperature
     BatVol = 0x00495C00,           // *40* Battery voltage
     BatAmp = 0x00495D00,           // *40* Battery current
+
     MeteringTotWhOut = 0x00260100, // *00* Total yield (aka SPOT_ETOTAL)
     MeteringDyWhOut = 0x00262200,  // *00* Day yield (aka SPOT_ETODAY)
 }
@@ -58,6 +73,11 @@ pub struct BatteryInfo {
 pub struct DCInfo {
     pub voltage: [u16; 2],
     pub current: [u16; 2],
+}
+
+pub struct ACInfo {
+    pub voltage: [u16; 3],
+    pub current: [u16; 3],
 }
 
 pub struct EnergyProductionInfo {
@@ -271,6 +291,11 @@ impl Inverter {
         command: 0x53800200,
         first: 0x00451F00,
         last: 0x004521FF,
+    };
+    const SPOT_AC_VOLTAGE: DataType = DataType {
+        command: 0x51000200,
+        first: 0x00464800,
+        last: 0x004655FF,
     };
     const BATTERY_CHARGE_STATUS: DataType = DataType {
         command: 0x51000200,
@@ -614,6 +639,88 @@ impl Inverter {
                     }
                 }
                 Ok(dc_info)
+            }
+            Err(error) => Err(InverterError {
+                message: error.message,
+            }),
+        }
+    }
+
+    pub fn get_ac_voltage(&mut self, socket: &Socket) -> Result<ACInfo, InverterError> {
+        match self.get_data(socket, &Inverter::SPOT_AC_VOLTAGE) {
+            Ok(mut buffer) => {
+                let mut ac_info = ACInfo {
+                    voltage: [0, 0, 0],
+                    current: [0, 0, 0],
+                };
+
+                while buffer.len() >= buffer.get_rpos()+(7*4) {
+                    let code = buffer.read_u32();
+                    if code == 0 {
+                        return Ok(ac_info);
+                    }
+                    let lri = code & 0x00FFFF00;
+                    let _data_type = code >> 24;
+
+                    if lri == AcMsVol0 as u32 && ac_info.voltage[0] == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ac_info.voltage[0] = value as u16;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else if lri == AcMsVol1 as u32 && ac_info.voltage[1] == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ac_info.voltage[1] = value as u16;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else if lri == AcMsVol2 as u32 && ac_info.voltage[2] == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ac_info.voltage[2] = value as u16;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else if lri == AcMsAmp0 as u32 && ac_info.current[0] == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ac_info.current[0] = value as u16;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else if lri == AcMsAmp1 as u32 && ac_info.current[1] == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ac_info.current[1] = value as u16;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else if lri == AcMsAmp2 as u32 && ac_info.current[2] == 0 {
+                        let _date = buffer.read_u32();
+                        let value = buffer.read_u32();
+                        ac_info.current[2] = value as u16;
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    } else {
+                        log!(format!("unhandled (ac voltage): {:x}", lri));
+                        let _date = buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                        buffer.read_u32();
+                    }
+                }
+                Ok(ac_info)
             }
             Err(error) => Err(InverterError {
                 message: error.message,
