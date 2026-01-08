@@ -1,6 +1,9 @@
 use crate::inverter::Lri::{
     BatAmp, BatChaStt, BatTmpVal, BatVol, DcMsAmp, DcMsVol, MeteringDyWhOut, MeteringTotWhOut,
 };
+
+use crate::log;
+
 use bytebuffer_new::ByteBuffer;
 use bytebuffer_new::Endian::{BigEndian, LittleEndian};
 use socket2::{SockAddr, Socket};
@@ -165,7 +168,7 @@ impl Inverter {
         match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
             Ok(_result) => {}
             Err(error) => {
-                println!("{}", error);
+                log!(format!("{}", error));
             }
         }
 
@@ -236,7 +239,7 @@ impl Inverter {
                 }
             }
             Err(err) => {
-                println!("{}", err);
+                log!(format!("{}", err));
                 Err(InverterError { message: "error" })
             }
         }
@@ -259,7 +262,7 @@ impl Inverter {
         match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
             Ok(_result) => {}
             Err(error) => {
-                println!("{}", error);
+                log!(format!("{}", error));
             }
         }
     }
@@ -306,7 +309,7 @@ impl Inverter {
         match socket.send_to(buffer.to_bytes().as_mut(), &SockAddr::from(self.address)) {
             Ok(_result) => {}
             Err(error) => {
-                println!("{}", error);
+                log!(format!("{}", error));
             }
         }
 
@@ -382,7 +385,7 @@ impl Inverter {
                 }
             }
             Err(err) => {
-                println!("{}", err);
+                log!(format!("{}", err));
                 Err(InverterError { message: "Error" })
             }
         }
@@ -606,7 +609,7 @@ impl Inverter {
                         buffer.read_u32();
                         buffer.read_u32();
                     } else {
-                        println!("unhandled (dc voltage): {:x}", lri);
+                        log!(format!("unhandled (dc voltage): {:x}", lri));
                         break;
                     }
                 }
@@ -653,7 +656,7 @@ impl Inverter {
                         buffer.read_u32();
                         buffer.read_u32();
                     } else {
-                        println!("unhandled (energy production): {:x}", lri);
+                        log!(format!("unhandled (energy production): {:x}", lri));
                         break;
                     }
                 }
