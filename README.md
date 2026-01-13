@@ -19,7 +19,7 @@ and if that works for you (point your browser to http://localhost:9745) you can 
 ## Configuration
 
 Optionally you can create a config file. You will need to do this if your inverter passwords are not "0000". 
-Currently the config file needs to be placed at /etc/sma_inverter_exporter.ini and it should contain one row per inverter:
+Currently, the config file needs to be placed at /etc/sma_inverter_exporter.ini, and it should contain one row per inverter:
  ```
  [inverter ip address].password=[password]
  ```
@@ -39,11 +39,16 @@ Relevant values scraped by Prometheus:
 ```
 Gauges (current values):
 
-smainverter_spot_dc_voltage_millivolts (for two solar panel lines per inverter)
-smainverter_spot_dc_current_milliamperes (for two solar panel lines per inverter)
 smainverter_battery_voltage_millivolts (for up to three batteries per inverter)
 smainverter_battery_current_milliamperes (for up to three batteries per inverter)
 smainverter_battery_charge_percentage (for up to three batteries per inverter)
+smainverter_battery_temperature_degreescelsius (for up to three batteries per inverter)
+smainverter_spot_dc_voltage_millivolts (for two solar panel lines per inverter)
+smainverter_spot_dc_current_milliamperes (for two solar panel lines per inverter)
+smainverter_spot_ac_voltage_millivolts (for three phases)
+smainverter_spot_ac_current_milliamperes (for three phases)
+smainverter_metering_total_watthours (for each inverter)
+smainverter_metering_daily_watthours (for each inverter)
 
 ```
 
