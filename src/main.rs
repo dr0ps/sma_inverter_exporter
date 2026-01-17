@@ -60,6 +60,8 @@ const AC_VOLTAGE: &str = "smainverter_spot_ac_voltage_millivolts";
 const AC_CURRENT: &str = "smainverter_spot_ac_current_milliamperes";
 const PRODUCTION_TOTAL: &str = "smainverter_metering_total_watthours";
 const PRODUCTION_DAILY: &str = "smainverter_metering_daily_watthours";
+const AC_POWER: &str = "smainverter_spot_ac_power_watts";
+
 
 fn is_discovery_response(response_packet: &[u8]) -> bool {
     // Discovery response packet as per https://cdn.sma.de/fileadmin/content/www.developer.sma.de/docs/SpeedwireDD-TI-en-10.pdf?v=1699275967
@@ -191,6 +193,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let gauge = GaugeVec::new(gauge_opts, &["inverter"]).unwrap();
     register(Box::new(gauge.borrow().clone())).unwrap();
     gauges.insert(PRODUCTION_DAILY, gauge);
+
+    let gauge_opts = Opts::new(AC_POWER, "Spot AC power");
+    let gauge = GaugeVec::new(gauge_opts, &["line"]).unwrap();
+    register(Box::new(gauge.borrow().clone())).unwrap();
+    gauges.insert(AC_POWER, gauge);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 9756));
 
@@ -434,6 +441,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         }
                     }
                 }
+                match i.get_ac_power(socket.borrow()) {
+                    Ok(data) => {
+                        gauges
+                            .get(AC_POWER)
+                            .unwrap()
+                            .with_label_values(&["1"])
+                            .set(data.power[0] as f64);
+                        gauges
+                            .get(AC_POWER)
+                            .unwrap()
+                            .with_label_values(&["2"])
+                            .set(data.power[1] as f64);
+                        gauges
+                            .get(AC_POWER)
+                            .unwrap()
+                            .with_label_values(&["3"])
+                            .set(data.power[2] as f64);
+                    }
+                    Err(inverter_error) => {
+                        if inverter_error.message.ne("Unsupported") {
+                            println!("Inverter error: {}", inverter_error.message);
+                        }
+                    }
+                }
+
             }
             log!("Finished getting data from all inverters.");
         }
